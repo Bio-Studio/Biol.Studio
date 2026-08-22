@@ -1,0 +1,8 @@
+# __NAME__ — Biolang 项目清单
+# 标准字段：name / version / repo（可选）+ [dependencies]
+name = "__NAME__"
+version = "0.1.0"
+
+[dependencies]
+# libfoo = { version = "1.0.0" }
+# libbar = { version = "0.2.0", repo = "https://..." }

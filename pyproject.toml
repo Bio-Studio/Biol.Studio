@@ -1,0 +1,19 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "biolstudio"
+version = "0.1.0"
+description = "BiolStudio — 快速编写 Biolang 项目的工具箱（Python 功能层原型）"
+requires-python = ">=3.10"
+readme = "README.md"
+
+[project.scripts]
+biolstudio = "biolstudio.cli:main"
+
+[tool.setuptools.packages.find]
+include = ["biolstudio*"]
+
+[tool.setuptools.package-data]
+biolstudio = ["../templates/**/*"]

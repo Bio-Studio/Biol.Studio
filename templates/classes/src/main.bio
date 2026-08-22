@@ -1,0 +1,24 @@
+// __NAME__ — 类与对象。Class 本质是流，new 分叉类流并自动调用 __init__。
+
+program main;
+
+Class Hero {
+    void __init__(name string, hp int) {
+        Obj::set(this, "name", name);
+        Obj::set(this, "hp", hp);
+        CIO::println("hero appears:", name);
+    }
+
+    int getHp() { res 100; }
+}
+
+Main {
+    void exec() {
+        ALL h = new Hero("TAK", 88);
+        CIO::println("object:", h);
+        CIO::println("name =", h.name, " hp =", h.hp);
+
+        ALL hp = h::getHp();
+        CIO::println("getHp() =", get hp);
+    }
+}

@@ -1,0 +1,4 @@
+{
+  "name": "hello",
+  "description": "最小可运行程序：program main + Main::exec + CIO::println"
+}

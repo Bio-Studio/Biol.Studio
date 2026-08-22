@@ -1,0 +1,6 @@
+// utils/config.bio — 提供常量 GREETING。
+// 顶层 const 是程序级常量，可满足其它文件的 `need value GREETING;`。
+
+program utils;
+
+const string GREETING = "Hello from utils/";

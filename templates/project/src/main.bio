@@ -1,0 +1,14 @@
+// __NAME__ — 标准项目入口。
+// 项目从 src/main.bio 出发，按 need 从 src/ + utils/ + .biolang/deps/ 递归捆绑。
+
+program main;
+
+need value GREETING;      // 由 utils/config.bio 提供
+need function greet;      // 由 utils/greeter.bio 提供
+
+Main {
+    void exec() {
+        CIO::println("main entry —", GREETING);
+        greet("project");
+    }
+}

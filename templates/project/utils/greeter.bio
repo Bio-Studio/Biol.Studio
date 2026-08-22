@@ -1,0 +1,13 @@
+// utils/greeter.bio — 提供方法 greet()。
+// 签名流 + fork：Stream 声明签名，同名 fork 提供实现。
+
+program utils;
+
+Stream Greeter {
+    void greet(name string);
+}
+Greeter G {
+    void greet(name string) {
+        CIO::println("hello,", name);
+    }
+}

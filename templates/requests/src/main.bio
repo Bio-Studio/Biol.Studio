@@ -1,0 +1,24 @@
+// __NAME__ — 请求模型：BioLang 里每个操作都是一个请求。
+// res = 响应；ref = 拒绝；ALL 同时携带响应与拒绝原因；
+// get 取实际值，cause 取拒绝原因。
+
+program main;
+
+Calc Math {
+    int divide(a int, b int) {
+        if (b == 0) { ref "division by zero"; }
+        res a / b;
+    }
+}
+
+Main {
+    void exec() {
+        // 正常响应：get 拿到值
+        ALL ok = Math::divide(10, 2);
+        CIO::println("10 / 2 =", get ok);
+
+        // 拒绝：cause 拿到原因
+        ALL bad = Math::divide(10, 0);
+        CIO::println("10 / 0 → refused:", cause bad);
+    }
+}

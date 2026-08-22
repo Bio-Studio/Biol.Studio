@@ -1,0 +1,24 @@
+// __NAME__ — 协作线程。spawn 起一个裸方法，yield 主动让出 CPU，join 等待结果。
+
+program main;
+
+Calc Worker {
+    void countUp(n int) {
+        ALL i = 0;
+        while (i < n) {
+            i = i + 1;
+            Threads::yield();
+        }
+        res i;
+    }
+}
+
+Main {
+    void exec() {
+        ALL t1 = get Threads::spawn("countUp", 5);
+        CIO::println("live threads:", get Threads::active());
+
+        ALL r1 = Threads::join(t1);
+        CIO::println("thread", t1, "countUp =", get r1);
+    }
+}

@@ -1,0 +1,5 @@
+# classes — Biolang 项目清单
+name = "__NAME__"
+version = "0.1.0"
+
+[dependencies]

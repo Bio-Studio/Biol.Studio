@@ -1,0 +1,10 @@
+// __NAME__ — 最小可运行 Biolang 程序。
+// 每个程序都以 `program main;` 开头，Main 流的 exec() 是入口。
+
+program main;
+
+Main {
+    void exec() {
+        CIO::println("Hello from __NAME__!");
+    }
+}
