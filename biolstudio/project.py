@@ -112,3 +112,32 @@ def resolve_target(arg: str) -> BioProject | str:
     if os.path.isfile(p):
         return p
     raise FileNotFoundError(f"{arg} 不存在")
+
+
+def dump_toml(meta: dict) -> str:
+    """把 meta 字典序列化成 package.toml（与 parse_toml 对称）。"""
+    lines: list[str] = []
+    lines.append("# BiuBiuBiu project manifest")
+    lines.append("# Standard fields: name / version / repo (optional) + [dependencies]")
+    for key in ("name", "version", "repo"):
+        if key in meta:
+            v = meta[key]
+            if isinstance(v, str):
+                lines.append(f'{key} = "{v}"')
+            else:
+                lines.append(f"{key} = {v}")
+    deps = meta.get("dependencies")
+    if isinstance(deps, dict) and deps:
+        lines.append("")
+        lines.append("[dependencies]")
+        for name, spec in deps.items():
+            if isinstance(spec, dict):
+                parts = []
+                for k in ("version", "repo"):
+                    if k in spec:
+                        parts.append(f'{k} = "{spec[k]}"')
+                lines.append(f"{name} = {{ {' '.join(parts)} }}")
+            else:
+                lines.append(f'{name} = "{spec}"')
+    lines.append("")
+    return "\n".join(lines)

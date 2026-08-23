@@ -27,10 +27,12 @@ from PyQt6.QtWidgets import (QApplication, QMainWindow, QWidget, QSplitter,
                              QTextEdit, QVBoxLayout, QHBoxLayout, QLabel,
                              QToolBar, QFileDialog, QDialog, QLineEdit,
                              QComboBox, QDialogButtonBox, QMessageBox,
-                             QTextBrowser, QCheckBox, QMenu, QToolTip)
+                             QTextBrowser, QCheckBox, QMenu, QToolTip,
+                             QPushButton, QTableWidget, QTableWidgetItem,
+                             QHeaderView)
 
 from . import lexer, checker, templates, gallery
-from .project import load_project
+from .project import load_project, parse_toml
 from .runner import find_bio
 
 APP_NAME = "Biol.Studio — BBB IDE"
@@ -106,6 +108,7 @@ class Settings:
         "sc_live": "",               # 实时错误检查（切换）
         "sc_highlight": "",          # 语法高亮（切换）
         "sc_zoom_reset": "Ctrl+0",   # 重置编辑器字体大小
+        "terminal_shell": "auto",  # 终端 shell：auto/bash/zsh/fish/sh/pwsh/cmd/自定义
         # 插件管理是独立选项（预留）
     }
 
@@ -135,6 +138,9 @@ class Settings:
     def __getitem__(self, k):
         return self.values.get(k, self.DEFAULTS.get(k, True))
 
+    def get(self, k, default=None):
+        return self.values.get(k, self.DEFAULTS.get(k, default))
+
     def __setitem__(self, k, v):
         self.values[k] = bool(v)
 
@@ -162,9 +168,10 @@ class FeaturesDialog(QDialog):
          "sc_zoom_reset", []),
     ]
 
-    def __init__(self, settings: Settings, parent=None):
+    def __init__(self, settings: Settings, parent=None, on_applied=None):
         super().__init__(parent)
         self.settings = settings
+        self.on_applied = on_applied or (lambda: None)
         self.setWindowTitle("功能管理")
         self.resize(520, 420)
         lay = QVBoxLayout(self)
@@ -172,8 +179,9 @@ class FeaturesDialog(QDialog):
         self.listw = QListWidget()
         self.listw.itemDoubleClicked.connect(self._open_feature)
         lay.addWidget(self.listw)
-        btn = QDialogButtonBox(QDialogButtonBox.StandardButton.Close)
-        btn.rejected.connect(self.reject)
+        btn = QDialogButtonBox()
+        btn.addButton("返回（撤销不保存）", QDialogButtonBox.ButtonRole.RejectRole).clicked.connect(self.reject)
+        btn.addButton("Apply（应用）", QDialogButtonBox.ButtonRole.ApplyRole).clicked.connect(self._apply_now)
         lay.addWidget(btn)
         self._refresh()
 
@@ -187,21 +195,26 @@ class FeaturesDialog(QDialog):
             it.setData(Qt.ItemDataRole.UserRole, key)
             self.listw.addItem(it)
 
+    def _apply_now(self):
+        self.on_applied()
+        self.statusBar().showMessage("设置已应用", 2000) if hasattr(self, 'statusBar') else None
+
     def _open_feature(self, item):
         key = item.data(Qt.ItemDataRole.UserRole)
-        dlg = FeatureDialog(self.settings, key, self)
+        dlg = FeatureDialog(self.settings, key, self, on_applied=self.on_applied)
         if dlg.exec() == QDialog.DialogCode.Accepted:
-            self.settings.save()
             self._refresh()
 
 
 class FeatureDialog(QDialog):
-    """功能内部设置（二级界面）：开关 + 快捷键 + 专属选项。"""
+    """功能内部设置（二级界面）：开关 + 快捷键 + 专属选项。
+    OK = 保存并关闭；Apply = 保存并应用（不关闭）；Cancel/返回 = 撤销修改不保存。"""
 
-    def __init__(self, settings: Settings, key: str, parent=None):
+    def __init__(self, settings: Settings, key: str, parent=None, on_applied=None):
         super().__init__(parent)
         self.settings = settings
         self.key = key
+        self.on_applied = on_applied or (lambda: None)
         info = next(f for f in FeaturesDialog.FEATURES if f[0] == key)
         _key, name, desc, sc_key, opts = info
         self.sc_key = sc_key
@@ -227,19 +240,59 @@ class FeatureDialog(QDialog):
             cb.setChecked(bool(settings[opt_key]))
             self.opt_boxes[opt_key] = cb
             lay.addWidget(cb)
-        btn = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok |
-                               QDialogButtonBox.StandardButton.Cancel)
-        btn.accepted.connect(self._apply)
-        btn.rejected.connect(self.reject)
+        # 终端专属：shell 选择（终端面板功能）
+        self.shell_cb = None
+        if key == "terminal_panel":
+            lay.addWidget(QLabel("终端 shell（支持多系统多 shell）："))
+            from PyQt6.QtWidgets import QComboBox as _QComboBox
+            self.shell_cb = _QComboBox()
+            shells = ["auto（自动检测）", "bash", "zsh", "fish", "sh", "pwsh", "powershell", "cmd", "自定义…"]
+            cur = settings.get("terminal_shell", "auto")
+            self.shell_cb.addItems(shells)
+            idx = next((i for i, s in enumerate(shells) if s.startswith(cur)), 0)
+            self.shell_cb.setCurrentIndex(idx)
+            self.shell_cb.currentIndexChanged.connect(self._shell_changed)
+            lay.addWidget(self.shell_cb)
+            self.shell_edit = QLineEdit(settings.get("terminal_shell", "auto"))
+            self.shell_edit.setPlaceholderText("shell 命令，如: /bin/bash 或 bash --norc")
+            self.shell_edit.setVisible(False)
+            lay.addWidget(self.shell_edit)
+        # 按钮：OK / Apply / Cancel
+        btn = QDialogButtonBox()
+        btn.addButton("取消（撤销）", QDialogButtonBox.ButtonRole.RejectRole).clicked.connect(self.reject)
+        btn.addButton("Apply", QDialogButtonBox.ButtonRole.ApplyRole).clicked.connect(self._apply_and_keep)
+        btn.addButton("OK（保存并关闭）", QDialogButtonBox.ButtonRole.AcceptRole).clicked.connect(self._apply)
         lay.addWidget(btn)
 
-    def _apply(self):
+    def _shell_changed(self, idx):
+        if self.shell_cb and self.shell_cb.currentText() == "自定义…":
+            self.shell_edit.setVisible(True)
+        else:
+            self.shell_edit.setVisible(False)
+
+    def _collect(self):
         self.settings[self.key] = self.enable_cb.isChecked()
         seq = self.sc_edit.keySequence().toString()
         self.settings[self.sc_key] = seq
         for k, cb in self.opt_boxes.items():
             self.settings[k] = cb.isChecked()
+        if self.shell_cb is not None:
+            sel = self.shell_cb.currentText()
+            if sel == "自定义…":
+                sel = self.shell_edit.text().strip() or "auto"
+            elif sel.startswith("auto"):
+                sel = "auto"
+            self.settings["terminal_shell"] = sel
+        self.settings.save()
+
+    def _apply(self):
+        self._collect()
+        self.on_applied()
         self.accept()
+
+    def _apply_and_keep(self):
+        self._collect()
+        self.on_applied()
 
 
 # ───────────────────────── 语法高亮 ─────────────────────────
@@ -442,6 +495,251 @@ class _LineNumberArea(QWidget):
         self._editor.paint_line_numbers(event)
 
 
+class TerminalPanel(QWidget):
+    """交互式终端面板：支持多 shell（auto/bash/zsh/fish/sh/pwsh/powershell/cmd/自定义）。
+    上：只读输出区；下：输入行。也承接 bbb 运行/构建输出。"""
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self._proc: QProcess | None = None
+        self._shell = "auto"
+        lay = QVBoxLayout(self)
+        lay.setContentsMargins(0, 0, 0, 0)
+        lay.setSpacing(2)
+        # 工具栏行：shell 选择 + 启动/停止 + 清空
+        bar = QHBoxLayout()
+        bar.addWidget(QLabel("shell:"))
+        self.shell_combo = QComboBox()
+        self.shell_combo.addItems(
+            ["auto（自动）", "bash", "zsh", "fish", "sh", "pwsh", "powershell", "cmd", "自定义…"])
+        self.shell_combo.currentIndexChanged.connect(self._shell_combo_changed)
+        bar.addWidget(self.shell_combo)
+        self.shell_edit = QLineEdit()
+        self.shell_edit.setPlaceholderText("shell 命令，如 /bin/bash")
+        self.shell_edit.setMaximumWidth(180)
+        self.shell_edit.setVisible(False)
+        bar.addWidget(self.shell_edit)
+        self.btn_start = QPushButton("启动终端")
+        self.btn_start.clicked.connect(self.start_shell)
+        bar.addWidget(self.btn_start)
+        self.btn_stop = QPushButton("停止")
+        self.btn_stop.clicked.connect(self.stop_shell)
+        self.btn_stop.setEnabled(False)
+        bar.addWidget(self.btn_stop)
+        self.btn_clear = QPushButton("清空")
+        self.btn_clear.clicked.connect(self.clear)
+        bar.addWidget(self.btn_clear)
+        bar.addStretch(1)
+        lay.addLayout(bar)
+        # 输出区（只读）
+        self.view = QPlainTextEdit()
+        self.view.setReadOnly(True)
+        font = QFont("JetBrains Mono, monospace")
+        font.setStyleHint(QFont.StyleHint.Monospace)
+        font.setPointSize(10)
+        self.view.setFont(font)
+        lay.addWidget(self.view, 1)
+        # 输入行
+        self.input = QLineEdit()
+        self.input.setPlaceholderText("输入命令，回车执行（shell 会话中）")
+        self.input.returnPressed.connect(self._send_input)
+        lay.addWidget(self.input)
+
+    def shell_command(self) -> list[str]:
+        sel = self.shell_combo.currentText()
+        if sel == "自定义…":
+            cmd = self.shell_edit.text().strip()
+            return cmd.split() if cmd else ["bash"]
+        if sel.startswith("auto"):
+            import shutil
+            for c in ("bash", "zsh", "fish", "pwsh", "powershell"):
+                if shutil.which(c):
+                    return [c, "-i"] if c not in ("powershell",) else [c]
+            return ["sh", "-i"]
+        if sel == "cmd":
+            return ["cmd.exe"]
+        if sel == "powershell":
+            return ["powershell"]
+        if sel == "pwsh":
+            return ["pwsh", "-i"]
+        return [sel, "-i"]
+
+    def _shell_combo_changed(self, idx):
+        self.shell_edit.setVisible(self.shell_combo.currentText() == "自定义…")
+
+    def start_shell(self):
+        if self._proc and self._proc.state() != QProcess.ProcessState.NotRunning:
+            self._proc.terminate()
+            return
+        cmd = self.shell_command()
+        self._proc = QProcess(self)
+        self._proc.setProcessChannelMode(QProcess.ProcessChannelMode.MergedChannels)
+        self._proc.readyReadStandardOutput.connect(self._read_out)
+        self._proc.finished.connect(lambda code, _st: self._on_finished(code))
+        self._proc.start(cmd[0], cmd[1:])
+        self.btn_start.setEnabled(False)
+        self.btn_stop.setEnabled(True)
+        self.view.appendPlainText(f"$ {' '.join(cmd)}   (已启动，输入命令回车执行)\n")
+
+    def stop_shell(self):
+        if self._proc:
+            self._proc.terminate()
+            if not self._proc.waitForFinished(1500):
+                self._proc.kill()
+
+    def _on_finished(self, code):
+        self.btn_start.setEnabled(True)
+        self.btn_stop.setEnabled(False)
+        self.view.appendPlainText(f"\n[终端进程结束，退出码 {code}]\n")
+
+    def _read_out(self):
+        if self._proc:
+            data = self._proc.readAllStandardOutput().data().decode(errors="replace")
+            self.view.appendPlainText(data)
+
+    def _send_input(self):
+        text = self.input.text()
+        self.input.clear()
+        if not text:
+            return
+        if self._proc and self._proc.state() != QProcess.ProcessState.NotRunning:
+            self._proc.write((text + "\n").encode())
+        else:
+            self.view.appendPlainText(f"> {text}\n（终端未启动：{text} 无法执行）\n")
+
+    def clear(self):
+        self.view.clear()
+
+    def append_output(self, text: str):
+        self.view.appendPlainText(text)
+
+
+# ───────────────────────── 项目设置（package.toml GUI 面板） ─────────────────────────
+
+class ProjectSettingsDialog(QDialog):
+    """项目设置面板：name/version/repo + [dependencies] 逐行编辑，与 package.toml 一一对应。
+    保存（Ctrl+S / 保存按钮）写回文件；返回 = 撤销修改不保存。"""
+
+    def __init__(self, root: str, parent=None):
+        super().__init__(parent)
+        self.root = root
+        self.path = os.path.join(root, "package.toml")
+        self.setWindowTitle("项目设置 — package.toml")
+        self.resize(520, 480)
+        try:
+            self.meta = parse_toml(open(self.path, encoding="utf-8").read())
+        except (OSError, Exception):
+            self.meta = {}
+        self._dirty = False
+        lay = QVBoxLayout(self)
+        # 基本信息（每行对应真实文本字段）
+        form = QVBoxLayout()
+        form.addWidget(QLabel("name（项目名）："))
+        self.name_ed = QLineEdit(str(self.meta.get("name", "")))
+        form.addWidget(self.name_ed)
+        form.addWidget(QLabel("version（版本）："))
+        self.ver_ed = QLineEdit(str(self.meta.get("version", "")))
+        form.addWidget(self.ver_ed)
+        form.addWidget(QLabel("repo（仓库 URL，可选）："))
+        self.repo_ed = QLineEdit(str(self.meta.get("repo", "")))
+        form.addWidget(self.repo_ed)
+        lay.addLayout(form)
+        # 依赖表
+        lay.addWidget(QLabel("dependencies（依赖；+ 号添加 repo，- 号删除）："))
+        self.deps_table = QTableWidget(0, 3)
+        self.deps_table.setHorizontalHeaderLabels(["名称", "version", "repo"])
+        self.deps_table.horizontalHeader().setSectionResizeMode(
+            0, QHeaderView.ResizeMode.Stretch)
+        self.deps_table.horizontalHeader().setSectionResizeMode(
+            1, QHeaderView.ResizeMode.ResizeToContents)
+        self.deps_table.horizontalHeader().setSectionResizeMode(
+            2, QHeaderView.ResizeMode.ResizeToContents)
+        lay.addWidget(self.deps_table, 1)
+        # 依赖操作按钮
+        dep_btn = QHBoxLayout()
+        btn_add = QPushButton("+ 添加依赖")
+        btn_add.clicked.connect(self._add_dep)
+        btn_del = QPushButton("- 删除选中")
+        btn_del.clicked.connect(self._del_dep)
+        dep_btn.addWidget(btn_add)
+        dep_btn.addWidget(btn_del)
+        dep_btn.addStretch(1)
+        lay.addLayout(dep_btn)
+        # 底部按钮：保存 / 返回
+        btn = QDialogButtonBox()
+        btn.addButton("返回（撤销不保存）", QDialogButtonBox.ButtonRole.RejectRole).clicked.connect(self.reject)
+        btn.addButton("保存 (Ctrl+S)", QDialogButtonBox.ButtonRole.AcceptRole).clicked.connect(self.save)
+        lay.addWidget(btn)
+        self._load_deps()
+
+    def _load_deps(self):
+        deps = self.meta.get("dependencies", {})
+        if not isinstance(deps, dict):
+            deps = {}
+        self.deps_table.setRowCount(len(deps))
+        for i, (name, spec) in enumerate(deps.items()):
+            ver = spec.get("version", "") if isinstance(spec, dict) else str(spec)
+            repo = spec.get("repo", "") if isinstance(spec, dict) else ""
+            self.deps_table.setItem(i, 0, QTableWidgetItem(name))
+            self.deps_table.setItem(i, 1, QTableWidgetItem(ver))
+            self.deps_table.setItem(i, 2, QTableWidgetItem(repo))
+
+    def _add_dep(self):
+        r = self.deps_table.rowCount()
+        self.deps_table.insertRow(r)
+        self.deps_table.setItem(r, 0, QTableWidgetItem("libname"))
+        self.deps_table.setItem(r, 1, QTableWidgetItem("1.0.0"))
+        self.deps_table.setItem(r, 2, QTableWidgetItem(""))
+
+    def _del_dep(self):
+        rows = sorted({i.row() for i in self.deps_table.selectedIndexes()}, reverse=True)
+        for r in rows:
+            self.deps_table.removeRow(r)
+
+    def collect(self) -> dict:
+        meta = {
+            "name": self.name_ed.text().strip(),
+            "version": self.ver_ed.text().strip(),
+        }
+        repo = self.repo_ed.text().strip()
+        if repo:
+            meta["repo"] = repo
+        deps = {}
+        for r in range(self.deps_table.rowCount()):
+            name = self.deps_table.item(r, 0).text().strip() if self.deps_table.item(r, 0) else ""
+            if not name:
+                continue
+            ver = self.deps_table.item(r, 1).text().strip() if self.deps_table.item(r, 1) else ""
+            repo2 = self.deps_table.item(r, 2).text().strip() if self.deps_table.item(r, 2) else ""
+            spec = {}
+            if ver:
+                spec["version"] = ver
+            if repo2:
+                spec["repo"] = repo2
+            deps[name] = spec if spec else "1.0.0"
+        if deps:
+            meta["dependencies"] = deps
+        return meta
+
+    def save(self):
+        from .project import dump_toml
+        meta = self.collect()
+        try:
+            os.makedirs(self.root, exist_ok=True)
+            with open(self.path, "w", encoding="utf-8") as f:
+                f.write(dump_toml(meta))
+        except OSError as e:
+            QMessageBox.warning(self, "保存失败", str(e))
+            return
+        self.accept()
+
+    def keyPressEvent(self, e):
+        if e.key() == Qt.Key.Key_S and e.modifiers() & Qt.KeyboardModifier.ControlModifier:
+            self.save()
+            return
+        super().keyPressEvent(e)
+
+
 # ───────────────────────── 主窗口 ─────────────────────────
 
 class MainWindow(QMainWindow):
@@ -486,6 +784,9 @@ class MainWindow(QMainWindow):
         act_save.triggered.connect(self.save_current)
         act_settings = QAction("功能管理…", self)
         act_settings.triggered.connect(self._dialog_settings)
+        act_proj = QAction("项目设置…", self)
+        act_proj.setShortcut(QKeySequence("Ctrl+Alt+P"))
+        act_proj.triggered.connect(self._dialog_project_settings)
         self._actions = dict(new=act_new, open=act_open, check=act_check,
                              run=act_run, build=act_build, save=act_save,
                              settings=act_settings)
@@ -494,9 +795,13 @@ class MainWindow(QMainWindow):
         tb.setMovable(False)
         for a in (act_new, act_open, act_save, act_check, act_run, act_build):
             tb.addAction(a)
+        tb.addSeparator()
+        tb.addAction(act_proj)
         self.addToolBar(tb)
 
         menubar = self.menuBar()
+        m_proj = menubar.addMenu("项目")
+        m_proj.addAction(act_proj)
         m_settings = menubar.addMenu("设置")
         m_settings.addAction(act_settings)
 
@@ -538,19 +843,18 @@ class MainWindow(QMainWindow):
         split_main.setSizes([220, 800, 260])
         self.setCentralWidget(split_main)
 
-        # 底部：诊断 + 终端
+        # 底部：诊断 + 终端（交互式多 shell）
         bottom = QSplitter(Qt.Orientation.Vertical)
         self.diag = QListWidget()
         self.diag.itemClicked.connect(self._diag_jump)
-        self.out = QTextBrowser()
-        self.out.setOpenExternalLinks(False)
+        self.out = TerminalPanel()
         self.diag_label = QLabel("诊断")
         self.out_label = QLabel("终端")
         bottom.addWidget(self.diag_label)
         bottom.addWidget(self.diag)
         bottom.addWidget(self.out_label)
         bottom.addWidget(self.out)
-        bottom.setSizes([140, 200])
+        bottom.setSizes([140, 220])
         split_main.addWidget(bottom)
         split_main.setStretchFactor(2, 1)
 
@@ -567,6 +871,13 @@ class MainWindow(QMainWindow):
         # 终端面板显隐（初始状态；快捷键可随时唤起）
         self.out.setVisible(bool(s["terminal_panel"]))
         self.out_label.setVisible(bool(s["terminal_panel"]))
+        # 终端 shell 同步
+        shell = s["terminal_shell"]
+        for i in range(self.out.shell_combo.count()):
+            item = self.out.shell_combo.itemText(i)
+            if item.startswith(shell) or (shell == "auto" and item.startswith("auto")):
+                self.out.shell_combo.setCurrentIndex(i)
+                break
         # 各编辑器内嵌错误开关 / 缩放开关 / 高亮
         for i in range(self.tabs.count()):
             w = self.tabs.widget(i)
@@ -669,10 +980,11 @@ class MainWindow(QMainWindow):
         self.statusBar().showMessage("编辑器字体大小已重置", 2000)
 
     def _dialog_settings(self):
-        dlg = FeaturesDialog(self.settings, self)
-        if dlg.exec() == QDialog.DialogCode.Accepted:
-            self.apply_settings()
-            self.statusBar().showMessage("设置已保存", 3000)
+        dlg = FeaturesDialog(self.settings, self, on_applied=self.apply_settings)
+        dlg.exec()
+        # 关闭后总是应用（二级 OK/Apply 已保存的设置立即生效）
+        self.apply_settings()
+        self.statusBar().showMessage("设置已保存", 3000)
 
     # ---- 模板 / 画廊 ----
 
@@ -680,6 +992,10 @@ class MainWindow(QMainWindow):
         self.tpl_list.clear()
         for t in templates.list_templates():
             self.tpl_list.addItem(t.name)
+
+    def _refresh_tree(self):
+        if self.project_root:
+            self._open_project(self.project_root)
 
     def _load_gallery(self):
         self.demo_list.clear()
@@ -751,7 +1067,19 @@ class MainWindow(QMainWindow):
     def _tree_open(self, item, _col):
         path = self._tree_path(item)
         if path and os.path.isfile(path):
+            if os.path.basename(path) == "package.toml" and self.project_root:
+                self._dialog_project_settings()
+                return
             self._open_file(path)
+
+    def _dialog_project_settings(self):
+        if not self.project_root:
+            QMessageBox.information(self, "项目设置", "请先打开/新建项目")
+            return
+        dlg = ProjectSettingsDialog(self.project_root, self)
+        if dlg.exec() == QDialog.DialogCode.Accepted:
+            self.statusBar().showMessage("项目设置已保存（package.toml 已更新）", 3000)
+            self._refresh_tree()
 
     def _tree_path(self, item):
         if not self.project_root:
@@ -888,10 +1216,7 @@ class MainWindow(QMainWindow):
         self._append_out(f"$ {bio} {' '.join(args)}\n")
 
     def _append_out(self, text):
-        if text.endswith("\n"):
-            self.out.append(text)
-        else:
-            self.out.append(text)
+        self.out.append_output(text)
 
     def _run_demo(self, item):
         text = item.text()
