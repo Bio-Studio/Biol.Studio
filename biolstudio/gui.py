@@ -99,7 +99,13 @@ class Settings:
         "diagnostics_panel": True, # 诊断列表面板
         "syntax_highlight": True,  # 语法高亮
         "ctrl_wheel_zoom": True,   # Ctrl+滚轮 切换编辑器字体大小
-        "terminal_shortcut": "F12",# 唤起终端面板的快捷键
+        # 每个功能内置快捷键（空 = 不绑定）
+        "sc_terminal": "F12",        # 终端面板（切换）
+        "sc_diagnostics": "Ctrl+Shift+D",  # 诊断面板（切换）
+        "sc_inline": "",             # 嵌入式错误显示（切换）
+        "sc_live": "",               # 实时错误检查（切换）
+        "sc_highlight": "",          # 语法高亮（切换）
+        "sc_zoom_reset": "Ctrl+0",   # 重置编辑器字体大小
         # 插件管理是独立选项（预留）
     }
 
@@ -133,43 +139,94 @@ class Settings:
         self.values[k] = bool(v)
 
 
-class SettingsDialog(QDialog):
-    """功能管理：启用/禁用 内嵌错误、终端、诊断面板、语法高亮。"""
+class FeaturesDialog(QDialog):
+    """功能管理（一级界面）：功能列表，点击进入二级设置。"""
+
+    FEATURES = [
+        # (key, 名称, 描述, 快捷键键, 二级专属选项)
+        ("inline_errors", "嵌入式错误显示",
+         "在编辑器内以波浪线 + 行号标记 + 悬停提示显示检查结果",
+         "sc_inline", [("live_errors", "实时错误检查",
+                        "编辑时自动检查当前文件，错误即时显示（输入停顿后刷新）")]),
+        ("terminal_panel", "终端面板",
+         "底部输出面板：运行/构建结果显示；快捷键可唤起",
+         "sc_terminal", []),
+        ("diagnostics_panel", "诊断面板",
+         "底部诊断列表（错误/警告，点击跳转）",
+         "sc_diagnostics", []),
+        ("syntax_highlight", "语法高亮",
+         "编辑器关键字/字符串/数字/注释着色",
+         "sc_highlight", []),
+        ("ctrl_wheel_zoom", "Ctrl+滚轮缩放",
+         "按住 Ctrl 滚动滚轮调整编辑器字体大小",
+         "sc_zoom_reset", []),
+    ]
 
     def __init__(self, settings: Settings, parent=None):
         super().__init__(parent)
         self.settings = settings
         self.setWindowTitle("功能管理")
-        self.setMinimumWidth(380)
+        self.resize(520, 420)
         lay = QVBoxLayout(self)
-        lay.addWidget(QLabel("启用 / 禁用内置功能（插件管理为独立选项，后续版本提供）："))
-        self.boxes = {}
-        for key, label, desc in [
-            ("inline_errors", "嵌入式显示错误信息",
-             "在编辑器内以波浪线 + 行号标记 + 悬停提示显示检查结果"),
-            ("live_errors", "实时错误显示",
-             "编辑时自动检查当前文件，错误即时显示（输入停顿后刷新）"),
-            ("terminal_panel", "终端面板",
-             "底部输出面板：运行/构建结果显示"),
-            ("diagnostics_panel", "诊断面板",
-             "底部诊断列表（错误/警告，点击跳转）"),
-            ("syntax_highlight", "语法高亮",
-             "编辑器关键字/字符串/数字/注释着色"),
-            ("ctrl_wheel_zoom", "Ctrl+滚轮切换字体大小",
-             "按住 Ctrl 滚动滚轮调整编辑器字体大小"),
-        ]:
-            cb = QCheckBox(label)
-            cb.setChecked(bool(self.settings[key]))
-            cb.setToolTip(desc)
-            self.boxes[key] = cb
-            lay.addWidget(cb)
-            lay.addWidget(QLabel(desc))
-        # 终端快捷键配置
-        lay.addWidget(QLabel("唤起终端面板的快捷键（点击输入框后按下组合键）："))
+        lay.addWidget(QLabel("内置功能列表（双击进入功能内部设置；插件管理为独立选项，后续版本提供）："))
+        self.listw = QListWidget()
+        self.listw.itemDoubleClicked.connect(self._open_feature)
+        lay.addWidget(self.listw)
+        btn = QDialogButtonBox(QDialogButtonBox.StandardButton.Close)
+        btn.rejected.connect(self.reject)
+        lay.addWidget(btn)
+        self._refresh()
+
+    def _refresh(self):
+        self.listw.clear()
+        for key, name, desc, sc_key, _opts in self.FEATURES:
+            state = "已启用" if bool(self.settings[key]) else "已禁用"
+            sc = self.settings[sc_key] or "未绑定"
+            it = QListWidgetItem(f"{name}    [{state}]    快捷键: {sc}")
+            it.setToolTip(desc)
+            it.setData(Qt.ItemDataRole.UserRole, key)
+            self.listw.addItem(it)
+
+    def _open_feature(self, item):
+        key = item.data(Qt.ItemDataRole.UserRole)
+        dlg = FeatureDialog(self.settings, key, self)
+        if dlg.exec() == QDialog.DialogCode.Accepted:
+            self.settings.save()
+            self._refresh()
+
+
+class FeatureDialog(QDialog):
+    """功能内部设置（二级界面）：开关 + 快捷键 + 专属选项。"""
+
+    def __init__(self, settings: Settings, key: str, parent=None):
+        super().__init__(parent)
+        self.settings = settings
+        self.key = key
+        info = next(f for f in FeaturesDialog.FEATURES if f[0] == key)
+        _key, name, desc, sc_key, opts = info
+        self.sc_key = sc_key
+        self.setWindowTitle(f"功能设置 — {name}")
+        self.setMinimumWidth(420)
+        lay = QVBoxLayout(self)
+        lay.addWidget(QLabel(desc))
+        lay.addSpacing(8)
+        # 启用开关
+        self.enable_cb = QCheckBox("启用该功能")
+        self.enable_cb.setChecked(bool(settings[key]))
+        lay.addWidget(self.enable_cb)
+        # 快捷键
+        lay.addWidget(QLabel("内置快捷键（点击输入框后按下组合键；清空 = 不绑定）："))
         from PyQt6.QtWidgets import QKeySequenceEdit
-        self.shortcut_edit = QKeySequenceEdit(
-            QKeySequence(self.settings["terminal_shortcut"]), self)
-        lay.addWidget(self.shortcut_edit)
+        self.sc_edit = QKeySequenceEdit(QKeySequence(settings[sc_key]), self)
+        lay.addWidget(self.sc_edit)
+        # 专属选项
+        self.opt_boxes = {}
+        for opt_key, opt_name, opt_desc in opts:
+            lay.addWidget(QLabel(opt_desc))
+            cb = QCheckBox(opt_name)
+            cb.setChecked(bool(settings[opt_key]))
+            self.opt_boxes[opt_key] = cb
+            lay.addWidget(cb)
         btn = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok |
                                QDialogButtonBox.StandardButton.Cancel)
         btn.accepted.connect(self._apply)
@@ -177,12 +234,11 @@ class SettingsDialog(QDialog):
         lay.addWidget(btn)
 
     def _apply(self):
-        for k, cb in self.boxes.items():
+        self.settings[self.key] = self.enable_cb.isChecked()
+        seq = self.sc_edit.keySequence().toString()
+        self.settings[self.sc_key] = seq
+        for k, cb in self.opt_boxes.items():
             self.settings[k] = cb.isChecked()
-        seq = self.shortcut_edit.keySequence().toString()
-        if seq:
-            self.settings["terminal_shortcut"] = seq
-        self.settings.save()
         self.accept()
 
 
@@ -523,29 +579,97 @@ class MainWindow(QMainWindow):
                     w._hl.rehighlight()
                 else:
                     w._hl.setDocument(None)
-        # 终端快捷键（重建）
-        self._rebind_terminal_shortcut()
+        # 功能快捷键（重建：每个功能内置快捷键）
+        self._rebind_shortcuts()
 
-    def _rebind_terminal_shortcut(self):
-        if self._term_shortcut is not None:
-            self._term_shortcut.activated.disconnect()
-            self._term_shortcut.setEnabled(False)
-            self._term_shortcut = None
-        seq = self.settings["terminal_shortcut"]
-        if not seq:
-            return
+    def _rebind_shortcuts(self):
+        # 清理旧的
+        for sc in getattr(self, "_shortcuts", []):
+            try:
+                sc.activated.disconnect()
+                sc.setEnabled(False)
+            except Exception:
+                pass
+        self._shortcuts = []
         from PyQt6.QtGui import QShortcut, QKeySequence
-        self._term_shortcut = QShortcut(QKeySequence(seq), self)
-        self._term_shortcut.activated.connect(self.toggle_terminal)
+        bindings = [
+            ("sc_terminal", self.toggle_terminal),
+            ("sc_diagnostics", self.toggle_diagnostics),
+            ("sc_inline", self.toggle_inline),
+            ("sc_live", self.toggle_live),
+            ("sc_highlight", self.toggle_highlight),
+            ("sc_zoom_reset", self.reset_zoom),
+        ]
+        for sc_key, handler in bindings:
+            seq = self.settings[sc_key]
+            if not seq:
+                continue
+            sc = QShortcut(QKeySequence(seq), self)
+            sc.activated.connect(handler)
+            self._shortcuts.append(sc)
+
+    # ---- 功能快捷键动作（每个功能：切换开关并即时应用） ----
 
     def toggle_terminal(self):
-        show = not self.out.isVisible()
+        self.settings["terminal_panel"] = not bool(self.settings["terminal_panel"])
+        self.settings.save()
+        show = bool(self.settings["terminal_panel"])
         self.out.setVisible(show)
         self.out_label.setVisible(show)
         self.statusBar().showMessage("终端面板已打开" if show else "终端面板已关闭", 2000)
 
+    def toggle_diagnostics(self):
+        self.settings["diagnostics_panel"] = not bool(self.settings["diagnostics_panel"])
+        self.settings.save()
+        show = bool(self.settings["diagnostics_panel"])
+        self.diag.setVisible(show)
+        self.diag_label.setVisible(show)
+        self.statusBar().showMessage("诊断面板已打开" if show else "诊断面板已关闭", 2000)
+
+    def toggle_inline(self):
+        self.settings["inline_errors"] = not bool(self.settings["inline_errors"])
+        self.settings.save()
+        for i in range(self.tabs.count()):
+            w = self.tabs.widget(i)
+            if isinstance(w, CodeEditor):
+                w.set_inline_enabled(bool(self.settings["inline_errors"]))
+        self.statusBar().showMessage(
+            "嵌入式错误显示已启用" if self.settings["inline_errors"] else "嵌入式错误显示已禁用", 2000)
+
+    def toggle_live(self):
+        self.settings["live_errors"] = not bool(self.settings["live_errors"])
+        self.settings.save()
+        self.statusBar().showMessage(
+            "实时错误检查已启用" if self.settings["live_errors"] else "实时错误检查已禁用", 2000)
+
+    def toggle_highlight(self):
+        self.settings["syntax_highlight"] = not bool(self.settings["syntax_highlight"])
+        self.settings.save()
+        for i in range(self.tabs.count()):
+            w = self.tabs.widget(i)
+            if isinstance(w, CodeEditor):
+                if bool(self.settings["syntax_highlight"]):
+                    if w._hl.document() is None:
+                        w._hl.setDocument(w.document())
+                    w._hl.rehighlight()
+                else:
+                    w._hl.setDocument(None)
+        self.statusBar().showMessage(
+            "语法高亮已启用" if self.settings["syntax_highlight"] else "语法高亮已禁用", 2000)
+
+    def reset_zoom(self):
+        for i in range(self.tabs.count()):
+            w = self.tabs.widget(i)
+            if isinstance(w, CodeEditor):
+                w._font_size = 11
+                f = w.font()
+                f.setPointSize(11)
+                w.setFont(f)
+                w.setTabStopDistance(4 * QFontMetrics(f).horizontalAdvance(' '))
+        self.statusBar().showMessage("编辑器字体大小已重置", 2000)
+
     def _dialog_settings(self):
-        dlg = SettingsDialog(self.settings, self)
+        dlg = FeaturesDialog(self.settings, self)
         if dlg.exec() == QDialog.DialogCode.Accepted:
             self.apply_settings()
             self.statusBar().showMessage("设置已保存", 3000)
