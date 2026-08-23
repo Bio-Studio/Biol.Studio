@@ -39,7 +39,7 @@ from .project import load_project, parse_toml
 from .runner import find_bio
 
 APP_NAME = "Biol.Studio — BBB IDE"
-APP_VERSION = "0.2.0"
+APP_VERSION = "1.0.0"
 
 
 # ───────────────────────── 语法高亮 ─────────────────────────
