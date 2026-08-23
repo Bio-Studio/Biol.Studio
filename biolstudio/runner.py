@@ -13,6 +13,7 @@ import sys
 from dataclasses import dataclass
 
 _CANDIDATES = [
+    os.environ.get("BBB_BIN", ""),
     os.environ.get("BIO_BIN", ""),
     os.path.expanduser("~/Projects/bio/bin/bio"),
 ]
@@ -23,7 +24,7 @@ def find_bio() -> str | None:
     for c in _CANDIDATES:
         if c and os.path.isfile(c) and os.access(c, os.X_OK):
             return c
-    return shutil.which("bio")
+    return shutil.which("bbb") or shutil.which("bio")
 
 
 @dataclass

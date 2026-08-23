@@ -1,4 +1,4 @@
-"""BioLang 词法器（纯 Python，功能层核心）。
+"""BiuBiuBiu 词法器（纯 Python，功能层核心）。
 
 输入 .bio / .bl 源码，输出 Token 流。服务于：
 - `biolstudio check` 的结构检查
@@ -12,7 +12,7 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass, field
 
-# BioLang 关键字（按 DESIGN.md / README / examples 归纳）
+# BiuBiuBiu 关键字（按 DESIGN.md / README / examples 归纳）
 KEYWORDS = {
     "program", "Main", "Stream", "Class", "const", "thread", "need",
     "res", "ref", "get", "cause", "ALL", "if", "else", "while", "for",

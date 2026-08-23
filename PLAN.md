@@ -1,6 +1,6 @@
 # BiolStudio 路线图
 
-目标：**让用户快速写一个 Biolang 项目**——从零开始到能跑，一分钟以内。
+目标：**让用户快速写一个 BiuBiuBiu 项目**——从零开始到能跑，一分钟以内。
 
 ## 阶段一：Python 功能层原型（当前，已完成）
 
@@ -33,4 +33,4 @@
 
 - 接入 Rust 版 bio（`~/Projects/bio/rust/`）：`check` 换用 Rust 的
   lexer/parser（更快、更准），通讯层通过进程协议调用
-- Biolang 包仓库浏览（复用 `need` 依赖解析）
+- BiuBiuBiu 包仓库浏览（复用 `need` 依赖解析）

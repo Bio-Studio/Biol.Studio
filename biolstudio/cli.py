@@ -1,7 +1,7 @@
 """biolstudio 命令行入口（argparse，纯标准库）。
 
 子命令：
-  new <name>           从模板创建 Biolang 项目
+  new <name>           从模板创建 BiuBiuBiu 项目
   templates            列出可用模板
   check <file|dir>     词法 + 结构检查（不依赖 bio）
   run <file|dir>       用 bio 解释运行
@@ -128,7 +128,7 @@ def cmd_demo(args: argparse.Namespace) -> int:
         if not demos:
             print("找不到示例库（设置 BIO_REPO 指向 bio 仓库）", file=sys.stderr)
             return EXIT_ERR
-        print("BioLang 示例画廊：")
+        print("BiuBiuBiu 示例画廊：")
         for d in demos:
             print(f"  {d.index:02d}  {d.filename:<28} {d.title}")
         return EXIT_OK
@@ -163,7 +163,7 @@ def cmd_doctor(args: argparse.Namespace) -> int:
 def build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(
         prog="biolstudio",
-        description="BiolStudio — 快速编写 Biolang 项目的工具箱（功能层原型）")
+        description="BiolStudio — 快速编写 BiuBiuBiu 项目的工具箱（功能层原型）")
     p.add_argument("--version", action="version", version=f"biolstudio {__version__}")
     sub = p.add_subparsers(dest="command", required=True)
 

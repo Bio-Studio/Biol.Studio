@@ -1,6 +1,6 @@
 # BiolStudio
 
-快速编写 Biolang 项目的工具箱。当前为 **Python 功能层原型**（v0.1.0）。
+快速编写 BiuBiuBiu 项目的工具箱。当前为 **Python 功能层原型**（v0.1.0）。
 
 ## 现状：三层层级
 
@@ -24,8 +24,8 @@ uv pip install -e .
 biolstudio doctor
 ```
 
-依赖：**纯 Python 标准库**（≥3.10）。运行/构建需要 `bio` 二进制（自动查找：
-`BIO_BIN` 环境变量 → `~/Projects/bio/bin/bio` → PATH）。
+依赖：**纯 Python 标准库**（≥3.10）。运行/构建需要 `bbb` 二进制（旧 C 版 `bio` 亦可）（自动查找：
+`BBB_BIN` 环境变量 → `~/Projects/bio/bin/bio` → PATH 中的 `bbb`/`bio`）。
 
 ## 用法
 
@@ -55,12 +55,12 @@ biolstudio doctor          # 环境自检
 ```
 biolstudio/
   cli.py       # argparse 入口（new/check/run/build/demo/tokens/doctor）
-  lexer.py     # BioLang 词法器（纯 Python，Token 流，供检查/高亮）
+  lexer.py     # BiuBiuBiu 词法器（纯 Python，Token 流，供检查/高亮）
   checker.py   # 结构检查：配平、program/Main 契约、need 配对（单文件+全项目）
   templates.py # 模板系统（templates/ 目录，BIOLSTUDIO_TEMPLATES 可加自定义）
   project.py   # 项目模型 + package.toml 最小 TOML 解析
-  runner.py    # bio 二进制驱动（run/build，dry-run 预览）
-  gallery.py   # 示例库（读 bio 仓库 examples/）
+  runner.py    # bbb 二进制驱动（run/build，dry-run 预览）
+  gallery.py   # 示例库（读 bio 仓库 examples/（BIO_REPO 可改路径））
   comm.py      # 通讯层占位（协议草案 v0.1，Go 层对齐用）
   render.py    # 渲染层占位（视图契约，Go 层实现用）
 templates/     # 内置模板（hello/project/requests/classes/threads）
@@ -69,7 +69,7 @@ tests/         # unittest，`python3 -m unittest discover -s tests`
 
 ## 已知限制
 
-- `biolstudio build` 依赖 bio 的编译模式；当前 `~/Projects/bio` 已迁移到 MPS
+- `biolstudio build` 依赖 bbb 的编译模式；当前 `~/Projects/bio` 已迁移到 MPS
   语言工作台、C 源码已删除，预编译 `bin/bio` 的编译模式会报
   `src/arena.c 没有那个文件或目录`——这是 bio 仓库状态所致，待 Rust 实现
   的编译后端就位后恢复（见 bio 仓库 `RUST-PLAN.md`）。

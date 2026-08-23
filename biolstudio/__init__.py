@@ -1,4 +1,4 @@
-"""BiolStudio — 快速编写 Biolang 项目的工具箱（Python 功能层原型）。
+"""BiolStudio — 快速编写 BiuBiuBiu 项目的工具箱（Python 功能层原型）。
 
 分层规划（见 PLAN.md）：
 - 功能层（本包，Python）：项目脚手架、词法/结构检查、示例库、bio 驱动
