@@ -31,8 +31,8 @@ EXIT_ERR = 2
 def _need_bio() -> str:
     bio = runner.find_bio()
     if not bio:
-        print("错误：找不到 bio 二进制。", file=sys.stderr)
-        print("  设置 BIO_BIN 环境变量，或安装 bio 到 PATH。", file=sys.stderr)
+        print("error: cannot find the bbb/bio binary.", file=sys.stderr)
+        print("  set BIO_BIN, or install bbb/bio on PATH.", file=sys.stderr)
         sys.exit(EXIT_ERR)
     return bio
 
@@ -40,7 +40,7 @@ def _need_bio() -> str:
 def cmd_new(args: argparse.Namespace) -> int:
     t = tmpl.find_template(args.template)
     if not t:
-        print(f"错误：模板 {args.template!r} 不存在。可用：", file=sys.stderr)
+        print(f"error: template {args.template!r} does not exist. available:", file=sys.stderr)
         for x in tmpl.list_templates():
             print(f"  {x.name:<10} {x.description}", file=sys.stderr)
         return EXIT_ERR
@@ -48,12 +48,12 @@ def cmd_new(args: argparse.Namespace) -> int:
     try:
         created = tmpl.scaffold(args.name, t, dest)
     except FileExistsError as e:
-        print(f"错误：{e}", file=sys.stderr)
+        print(f"error: {e}", file=sys.stderr)
         return EXIT_ERR
-    print(f"已创建项目 {args.name}（模板 {t.name}）：")
+    print(f"created project {args.name} (template {t.name}):")
     for f in created:
         print(f"  {f}")
-    print(f"\n下一步：\n  cd {os.path.join(dest, args.name)}")
+    print(f"\nnext: cd {os.path.join(dest, args.name)}")
     print("  biolstudio check .   # 静态检查")
     print("  biolstudio run .     # 运行")
     return EXIT_OK
@@ -62,9 +62,9 @@ def cmd_new(args: argparse.Namespace) -> int:
 def cmd_templates(args: argparse.Namespace) -> int:
     ts = tmpl.list_templates()
     if not ts:
-        print("没有可用模板（BIOLSTUDIO_TEMPLATES 指向的目录为空？）", file=sys.stderr)
+        print("no templates available (BIOLSTUDIO_TEMPLATES points to an empty dir?)", file=sys.stderr)
         return EXIT_ERR
-    print("可用模板：")
+    print("available templates:")
     for t in ts:
         print(f"  {t.name:<10} {t.description}")
     return EXIT_OK
@@ -77,13 +77,13 @@ def cmd_check(args: argparse.Namespace) -> int:
     elif os.path.isfile(target):
         diags = check_file(target)
     else:
-        print(f"错误：{args.target} 不存在", file=sys.stderr)
+        print(f"error: {args.target} does not exist", file=sys.stderr)
         return EXIT_ERR
     errors = [d for d in diags if d.severity == "error"]
     warnings = [d for d in diags if d.severity == "warning"]
     for d in diags:
         print(d.render())
-    print(f"\n{len(errors)} 错误, {len(warnings)} 警告")
+    print(f"\n{len(errors)} errors, {len(warnings)} warnings")
     return EXIT_OK if not errors else EXIT_DIAG
 
 
@@ -111,12 +111,12 @@ def cmd_tokens(args: argparse.Namespace) -> int:
     try:
         src = open(args.file, encoding="utf-8").read()
     except OSError as e:
-        print(f"错误：{e}", file=sys.stderr)
+        print(f"error: {e}", file=sys.stderr)
         return EXIT_ERR
     try:
         toks = tokenize(src, args.file)
     except LexError as e:
-        print(f"词法错误：{args.file}:{e.line}:{e.col}: {e.msg}", file=sys.stderr)
+        print(f"lex error: {args.file}:{e.line}:{e.col}: {e.msg}", file=sys.stderr)
         return EXIT_DIAG
     print(tokens_to_text(toks))
     return EXIT_OK
@@ -218,7 +218,7 @@ def main(argv: list[str] | None = None) -> int:
     try:
         return args.func(args)
     except FileNotFoundError as e:
-        print(f"错误：{e}", file=sys.stderr)
+        print(f"error: {e}", file=sys.stderr)
         return EXIT_ERR
 
 

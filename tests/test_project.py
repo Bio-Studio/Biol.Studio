@@ -55,7 +55,7 @@ class TestProject(unittest.TestCase):
             "program main;\nMain { void exec() { CIO::println(\"x\"); }\n")
         diags = checker.check_file(main)
         msgs = " ".join(d.message for d in diags)
-        self.assertIn("未闭合", msgs)
+        self.assertIn("unclosed", msgs)
 
     def test_parse_toml(self):
         from biolstudio.project import parse_toml

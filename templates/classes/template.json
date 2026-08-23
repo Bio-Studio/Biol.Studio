@@ -1,4 +1,4 @@
 {
   "name": "classes",
-  "description": "类与对象：Class / new / __init__ / this / Obj::set-get"
+  "description": "类与对象 + 接口：Class / implements / Interface / new / __init__ / this"
 }

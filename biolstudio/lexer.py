@@ -14,7 +14,8 @@ from dataclasses import dataclass, field
 
 # BiuBiuBiu 关键字（按 DESIGN.md / README / examples 归纳）
 KEYWORDS = {
-    "program", "Main", "Stream", "Class", "const", "thread", "need",
+    "program", "Main", "Stream", "Class", "Interface", "implements",
+    "const", "thread", "need",
     "res", "ref", "get", "cause", "ALL", "if", "else", "while", "for",
     "break", "continue", "new", "this",
     # 基础类型

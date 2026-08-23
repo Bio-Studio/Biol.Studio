@@ -1,24 +1,29 @@
-// __NAME__ — 类与对象。Class 本质是流，new 分叉类流并自动调用 __init__。
+// __NAME__ — 类与对象 + 接口。Class 本质是流的分叉，new 宏分叉类流并自动调用 __init__。
 
 program main;
 
-Class Hero {
+Interface Greeter {
+    string greet();
+}
+
+Class Hero implements Greeter {
     void __init__(name string, hp int) {
-        Obj::set(this, "name", name);
-        Obj::set(this, "hp", hp);
-        CIO::println("hero appears:", name);
+        this::name = name;
+        this::hp = hp;
     }
 
-    int getHp() { res 100; }
+    string greet() { res SIO::format("Hello, I'm %s (hp %d)", this::name, this::hp); }
+
+    string name;
+    int hp;
 }
 
 Main {
     void exec() {
-        ALL h = new Hero("TAK", 88);
-        CIO::println("object:", h);
-        CIO::println("name =", h.name, " hp =", h.hp);
+        Hero h = new Hero("TAK", 88);
+        CIO::println(h::greet());
 
-        ALL hp = h::getHp();
-        CIO::println("getHp() =", get hp);
+        Greeter g = new Hero("ADA", 100);
+        CIO::println(g::greet());
     }
 }
