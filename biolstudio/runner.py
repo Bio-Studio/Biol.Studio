@@ -1,7 +1,8 @@
-"""bio 二进制驱动（功能层）。
+"""bbb 二进制驱动（功能层）。
 
-查找顺序：BIO_BIN 环境变量 → ~/Projects/bio/bin/bio（本机 bio 仓库预编译产物）
-→ PATH 中的 bio。所有执行均流式透传 stdout/stderr，支持 dry_run 预览。
+查找顺序：BBB_BIN 环境变量 → ~/Projects/bio/rust/target/release/bbb（Rust 实现）
+→ PATH 中的 bbb → 旧版 ~/Projects/bio/bin/bio（legacy C，仅解释可用）→ PATH 中的 bio。
+所有执行均流式透传 stdout/stderr，支持 dry_run 预览。
 """
 
 from __future__ import annotations
@@ -15,6 +16,7 @@ from dataclasses import dataclass
 _CANDIDATES = [
     os.environ.get("BBB_BIN", ""),
     os.environ.get("BIO_BIN", ""),
+    os.path.expanduser("~/Projects/bio/rust/target/release/bbb"),
     os.path.expanduser("~/Projects/bio/bin/bio"),
 ]
 _CANDIDATES = [c for c in _CANDIDATES if c]
