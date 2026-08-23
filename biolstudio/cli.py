@@ -160,6 +160,12 @@ def cmd_doctor(args: argparse.Namespace) -> int:
     return EXIT_OK if ok else EXIT_ERR
 
 
+def cmd_gui(args: argparse.Namespace) -> int:
+    from .gui import run
+    run()
+    return EXIT_OK
+
+
 def build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(
         prog="biolstudio",
@@ -198,6 +204,9 @@ def build_parser() -> argparse.ArgumentParser:
     sp.add_argument("demo", nargs="?", default=None,
                     help="list=列出全部；否则为示例编号或文件名")
     sp.set_defaults(func=cmd_demo)
+
+    sp = sub.add_parser("gui", help="启动 GUI（BBB IDE）")
+    sp.set_defaults(func=cmd_gui)
 
     sub.add_parser("doctor", help="环境自检").set_defaults(func=cmd_doctor)
     return p
