@@ -1,33 +1,77 @@
 # Biol.Studio
 
-A toolbox for writing **BiuBiuBiu** projects quickly. Current stage: **Python
-functional-layer prototype** (v0.1.0).
-
-## Layers
+A toolbox for writing **BiuBiuBiu** projects quickly. Three layers:
 
 | Layer | Language | Status | Responsibility |
 |---|---|---|---|
-| Functional | Python | ✅ prototype | project scaffolding, lexer/checker, example gallery, `bbb` CLI driver |
-| Communication | Go | ⏳ next | local service, task execution, event push (protocol draft in `biolstudio/comm.py`) |
-| Rendering | Go | ⏳ next | project tree, highlighted editor, output panel, demo gallery (contract in `biolstudio/render.py`) |
+| Functional (business) | Python | ✅ done | project scaffolding, lexer/checker, example gallery, `bbb` CLI driver (`biolstudio/`) |
+| Communication | Go | ✅ done | JSON-RPC 2.0 service (stdio / TCP), tasks, protocol v0.1 (`go/server/`) |
+| Rendering | Go | ✅ done | Fyne GUI: project tree, highlighted editor, output panel, demo gallery (`go/gui/`) |
 
 Roadmap details: [PLAN.md](PLAN.md).
+
+## Layers
+
+### Python functional layer (business logic)
+
+Pure standard library (≥3.10). Every capability is a stateless CLI command,
+callable directly or wrapped by the Go layers:
+
+```bash
+biolstudio new myapp -t project     # scaffold (supports --json)
+biolstudio check myapp --json       # static check as JSON diagnostics
+biolstudio run myapp                # run via bbb
+biolstudio build myapp              # build via bbb
+biolstudio demo list --json         # gallery as JSON
+biolstudio templates --json         # templates as JSON
+```
+
+### Go communication layer
+
+JSON-RPC 2.0 over **stdio** (default, embeddable in editors) or **TCP**
+(`-tcp 127.0.0.1:port`). Methods match the CLI subcommands one-to-one
+(protocol v0.1, see `biolstudio/comm.py`):
+
+```bash
+cd go && make server
+printf '%s\n' \
+  '{"jsonrpc":"2.0","id":1,"method":"ping"}' \
+  '{"jsonrpc":"2.0","id":2,"method":"project.new","params":{"name":"myapp","template":"hello","base":"/tmp"}}' \
+  '{"jsonrpc":"2.0","id":3,"method":"project.run","params":{"root":"/tmp/myapp"}}' \
+  '{"jsonrpc":"2.0","id":4,"method":"shutdown"}' \
+  | ./server/biolstudio-server
+```
+
+Methods: `ping` · `project.new` · `project.check` · `project.run` ·
+`project.build` · `demo.list` · `demo.run` · `templates` · `shutdown`.
+
+### Go rendering layer
+
+Fyne GUI (`go/gui`):
+
+```bash
+cd go && make gui && ./gui/biolstudio-gui
+```
+
+- Project tree (src/ + utils/ + package.toml), multi-tab editor
+- Syntax-highlighted read-only preview for gallery examples
+- Run / build / check actions with live output panel
+- Template-based project wizard
 
 ## Install / Run
 
 ```bash
-# Run directly (no install)
-cd Biol.Studio
-python3 -m biolstudio.cli doctor
+# Python layer (run directly, no install)
+python3 -m biolstudio doctor
 
 # Or install as a command (uv / pip)
 uv pip install -e .
 biolstudio doctor
 ```
 
-Dependencies: **pure Python standard library** (≥3.10). Running/building needs
-the `bbb` binary (auto-detected: `BBB_BIN` env → `~/Projects/bio/bin/bio` →
-`bbb`/`bio` on PATH).
+Dependencies: **pure Python standard library** (≥3.10) for the functional
+layer; **Go ≥ 1.26 + Fyne** for the Go layers. Running/building needs the
+`bbb` binary (auto-detected: `BBB_BIN` env → PATH `bbb` → `bio`).
 
 ## Usage
 

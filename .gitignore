@@ -3,3 +3,7 @@ __pycache__/
 *.egg-info/
 build/
 dist/
+
+# Go 编译产物
+/go/server/biolstudio-server
+/go/gui/biolstudio-gui

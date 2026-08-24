@@ -50,6 +50,10 @@ def cmd_new(args: argparse.Namespace) -> int:
     except FileExistsError as e:
         print(f"error: {e}", file=sys.stderr)
         return EXIT_ERR
+    if getattr(args, "json", False):
+        import json as _json
+        print(_json.dumps({"name": args.name, "template": t.name, "files": created}))
+        return EXIT_OK
     print(f"created project {args.name} (template {t.name}):")
     for f in created:
         print(f"  {f}")
@@ -64,6 +68,10 @@ def cmd_templates(args: argparse.Namespace) -> int:
     if not ts:
         print("no templates available (BIOLSTUDIO_TEMPLATES points to an empty dir?)", file=sys.stderr)
         return EXIT_ERR
+    if getattr(args, "json", False):
+        import json as _json
+        print(_json.dumps([{"name": t.name, "description": t.description} for t in ts]))
+        return EXIT_OK
     print("available templates:")
     for t in ts:
         print(f"  {t.name:<10} {t.description}")
@@ -79,6 +87,13 @@ def cmd_check(args: argparse.Namespace) -> int:
     else:
         print(f"error: {args.target} does not exist", file=sys.stderr)
         return EXIT_ERR
+    if getattr(args, "json", False):
+        import json as _json
+        print(_json.dumps([{
+            "file": d.file, "line": d.line, "col": d.col,
+            "severity": d.severity, "message": d.message,
+        } for d in diags]))
+        return EXIT_OK if not [d for d in diags if d.severity == "error"] else EXIT_DIAG
     errors = [d for d in diags if d.severity == "error"]
     warnings = [d for d in diags if d.severity == "warning"]
     for d in diags:
@@ -128,6 +143,11 @@ def cmd_demo(args: argparse.Namespace) -> int:
         if not demos:
             print("找不到示例库（设置 BIO_REPO 指向 bio 仓库）", file=sys.stderr)
             return EXIT_ERR
+        if getattr(args, "json", False):
+            import json as _json
+            print(_json.dumps([{"index": d.index, "title": d.title,
+                                "filename": d.filename, "path": d.path} for d in demos]))
+            return EXIT_OK
         print("BiuBiuBiu 示例画廊：")
         for d in demos:
             print(f"  {d.index:02d}  {d.filename:<28} {d.title}")
@@ -177,12 +197,16 @@ def build_parser() -> argparse.ArgumentParser:
     sp.add_argument("name", help="项目名")
     sp.add_argument("--template", "-t", default="hello", help="模板名（默认 hello）")
     sp.add_argument("--dir", "-d", default=None, help="创建目录（默认当前目录）")
+    sp.add_argument("--json", action="store_true", help="输出 JSON 结果")
     sp.set_defaults(func=cmd_new)
 
-    sub.add_parser("templates", help="列出可用模板").set_defaults(func=cmd_templates)
+    sp_tpl = sub.add_parser("templates", help="列出可用模板")
+    sp_tpl.add_argument("--json", action="store_true", help="输出 JSON 数组")
+    sp_tpl.set_defaults(func=cmd_templates)
 
     sp = sub.add_parser("check", help="词法 + 结构检查（无需 bio）")
     sp.add_argument("target", help=".bio 文件或项目目录")
+    sp.add_argument("--json", action="store_true", help="输出 JSON 诊断数组")
     sp.set_defaults(func=cmd_check)
 
     sp = sub.add_parser("run", help="用 bio 解释运行")
@@ -203,6 +227,7 @@ def build_parser() -> argparse.ArgumentParser:
     sp = sub.add_parser("demo", help="运行 bio 仓库示例（demo list 列出全部）")
     sp.add_argument("demo", nargs="?", default=None,
                     help="list=列出全部；否则为示例编号或文件名")
+    sp.add_argument("--json", action="store_true", help="demo list 输出 JSON")
     sp.set_defaults(func=cmd_demo)
 
     sp = sub.add_parser("gui", help="启动 GUI（BBB IDE）")
