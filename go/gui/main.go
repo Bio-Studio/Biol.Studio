@@ -19,7 +19,6 @@ import (
 	"fyne.io/fyne/v2/theme"
 	"fyne.io/fyne/v2/widget"
 
-	"biolstudio/gui/highlight"
 	"biolstudio/internal/biolang"
 )
 
@@ -33,9 +32,6 @@ type gui struct {
 	tree    *widget.Tree
 	tabs    *container.AppTabs
 	out     *widget.Entry
-	demos   *widget.List
-	demoIdx []biolang.Demo
-	selectedDemo int
 	tpls         []string
 	root    string
 	mu      sync.Mutex
@@ -109,23 +105,6 @@ func main() {
 	g.tabs = container.NewAppTabs()
 	g.tabs.SetTabLocation(container.TabLocationTop)
 
-	// ---- 右侧：示例画廊 ----
-	g.demos = widget.NewList(
-		func() int { return len(g.demoIdx) },
-		func() fyne.CanvasObject { return widget.NewLabel("") },
-		func(i int, o fyne.CanvasObject) {
-			o.(*widget.Label).SetText(fmt.Sprintf("%02d  %s", g.demoIdx[i].Index, g.demoIdx[i].Title))
-		},
-	)
-	g.demos.OnSelected = func(i int) {
-		if i < 0 || i >= len(g.demoIdx) {
-			return
-		}
-		g.selectedDemo = i
-		d := g.demoIdx[i]
-		g.openHighlight(d.Path, fmt.Sprintf("%02d %s", d.Index, d.Title))
-	}
-
 	// ---- 底部：输出面板 ----
 	g.out = widget.NewMultiLineEntry()
 	g.out.Disable()
@@ -135,15 +114,10 @@ func main() {
 	left := container.NewBorder(
 		widget.NewLabelWithStyle("项目", fyne.TextAlignLeading, fyne.TextStyle{Bold: true}),
 		nil, nil, nil, g.tree)
-	right := container.NewBorder(
-		widget.NewLabelWithStyle("示例画廊（点击运行）", fyne.TextAlignLeading, fyne.TextStyle{Bold: true}),
-		nil, nil, nil, g.demos)
 	midContent := container.NewBorder(nil, g.out, nil, nil, g.tabs)
 
-	leftMid := container.NewHSplit(left, midContent)
-	leftMid.SetOffset(0.25)
-	all := container.NewHSplit(leftMid, right)
-	all.SetOffset(0.78)
+	all := container.NewHSplit(left, midContent)
+	all.SetOffset(0.25)
 
 	// ---- 工具栏 ----
 	tb := widget.NewToolbar(
@@ -154,14 +128,12 @@ func main() {
 		widget.NewToolbarAction(theme.ConfirmIcon(), func() { g.buildProject() }),
 		widget.NewToolbarAction(theme.SearchIcon(), func() { g.checkProject() }),
 		widget.NewToolbarSeparator(),
-		widget.NewToolbarAction(theme.MediaReplayIcon(), g.runSelectedDemo),
 		widget.NewToolbarAction(theme.ComputerIcon(), g.aboutDialog),
 	)
 
 	g.win.SetContent(container.NewBorder(tb, nil, nil, nil, all))
 	g.win.Show()
 
-	go g.loadDemos()
 	go g.loadTemplates()
 	a.Run()
 }
@@ -180,15 +152,6 @@ func (g *gui) appendOut(s string) {
 		text := g.out.Text + s
 		fyne.Do(func() { g.out.SetText(text) })
 	}
-}
-
-func (g *gui) loadDemos() {
-	demos, err := biolang.ListDemos()
-	if err != nil {
-		return
-	}
-	g.demoIdx = demos
-	fyne.Do(func() { g.demos.Refresh() })
 }
 
 func (g *gui) loadTemplates() {
@@ -331,33 +294,4 @@ func (g *gui) aboutDialog() {
 func homeDir() string {
 	h, _ := os.UserHomeDir()
 	return h
-}
-
-// openHighlight 以高亮只读视图打开文件（示例画廊用）。
-func (g *gui) openHighlight(path, title string) {
-	data, err := os.ReadFile(path)
-	if err != nil {
-		return
-	}
-	rt := highlight.Highlight(string(data))
-	scroll := container.NewVScroll(rt)
-	ti := container.NewTabItem(title, scroll)
-	g.tabs.Append(ti)
-	g.tabs.Select(ti)
-}
-
-// runSelectedDemo 运行当前选中的示例。
-func (g *gui) runSelectedDemo() {
-	idx := g.selectedDemo
-	if idx < 0 || idx >= len(g.demoIdx) {
-		dialog.ShowInformation("运行示例", "先在右侧画廊选择一个示例", g.win)
-		return
-	}
-	d := g.demoIdx[idx]
-	g.out.SetText("")
-	go func() {
-		g.appendOut(fmt.Sprintf("$ bbb %s\n", d.Path))
-		r := biolang.RunFile(d.Path)
-		g.appendOut(r.Output + fmt.Sprintf("[exit %d]\n", r.ExitCode))
-	}()
 }

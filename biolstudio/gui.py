@@ -1,13 +1,13 @@
 """Biol.Studio GUI — 专业的 BBB (BiuBiuBiu) IDE（PyQt6）。
 
 复用功能层：lexer（高亮）、checker（诊断）、project/templates（项目）、
-runner（运行/构建）、gallery（示例画廊）。
+runner（运行/构建）。
 
 特性：
 - 项目树 / 多标签编辑器（语法高亮 + 行号 + 错误波浪线 + 悬停提示 + 内嵌错误条）
 - 检查（Ctrl+Shift+C）：诊断面板点击跳转；编辑器内联显示错误
 - 运行（F5）/ 构建（F7）：终端面板流式输出
-- 示例画廊双击运行；模板向导新建项目
+- 模板向导新建项目
 - 功能管理设置：内嵌错误显示 / 终端面板 / 诊断面板 / 语法高亮 可开关
 """
 
@@ -31,7 +31,7 @@ from PyQt6.QtWidgets import (QApplication, QMainWindow, QWidget, QSplitter,
                              QPushButton, QTableWidget, QTableWidgetItem,
                              QHeaderView)
 
-from . import lexer, checker, templates, gallery
+from . import lexer, checker, templates
 from .project import load_project, parse_toml
 from .runner import find_bio
 
@@ -756,7 +756,6 @@ class MainWindow(QMainWindow):
 
         self._build_actions()
         self._build_ui()
-        self._load_gallery()
         self._load_templates()
         self.apply_settings()
         self.statusBar().showMessage(f"bbb: {find_bio() or '未找到'}")
@@ -830,17 +829,7 @@ class MainWindow(QMainWindow):
         self.tabs.tabCloseRequested.connect(self.tabs.removeTab)
         split_main.addWidget(self.tabs)
 
-        # 右：示例画廊
-        right = QWidget()
-        right_lay = QVBoxLayout(right)
-        right_lay.setContentsMargins(0, 0, 0, 0)
-        self.demo_list = QListWidget()
-        self.demo_list.itemDoubleClicked.connect(self._run_demo)
-        right_lay.addWidget(QLabel("示例画廊（双击运行）"))
-        right_lay.addWidget(self.demo_list)
-        right.setMaximumWidth(280)
-        split_main.addWidget(right)
-        split_main.setSizes([220, 800, 260])
+        split_main.setSizes([220, 860])
         self.setCentralWidget(split_main)
 
         # 底部：诊断 + 终端（交互式多 shell）
@@ -986,7 +975,7 @@ class MainWindow(QMainWindow):
         self.apply_settings()
         self.statusBar().showMessage("设置已保存", 3000)
 
-    # ---- 模板 / 画廊 ----
+    # ---- 模板 ----
 
     def _load_templates(self):
         self.tpl_list.clear()
@@ -996,11 +985,6 @@ class MainWindow(QMainWindow):
     def _refresh_tree(self):
         if self.project_root:
             self._open_project(self.project_root)
-
-    def _load_gallery(self):
-        self.demo_list.clear()
-        for d in gallery.list_demos():
-            self.demo_list.addItem(f"{d.index:02d}  {d.title}")
 
     # ---- 项目操作 ----
 
@@ -1217,22 +1201,6 @@ class MainWindow(QMainWindow):
 
     def _append_out(self, text):
         self.out.append_output(text)
-
-    def _run_demo(self, item):
-        text = item.text()
-        idx = text.split()[0]
-        d = gallery.find_demo(idx)
-        bio = find_bio()
-        if not d or not bio:
-            return
-        self.out.clear()
-        self._proc = QProcess(self)
-        self._proc.setProcessChannelMode(QProcess.ProcessChannelMode.MergedChannels)
-        self._proc.readyReadStandardOutput.connect(
-            lambda: self._append_out(self._proc.readAllStandardOutput().data().decode(errors="replace")))
-        self._proc.finished.connect(lambda code, _st: self._append_out(f"\n[退出码 {code}]\n"))
-        self._proc.start(bio, [d.path])
-        self._append_out(f"$ {bio} {d.path}\n")
 
     def _new_from_template(self, item):
         name = item.text()

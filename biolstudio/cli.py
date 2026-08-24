@@ -7,7 +7,6 @@
   run <file|dir>       用 bio 解释运行
   build <file|dir>     用 bio 编译（-o 指定输出）
   tokens <file>        调试：打印 Token 流
-  demo [编号|名字]      运行 bio 仓库示例（demo list 列出）
   doctor               环境自检
 """
 
@@ -18,7 +17,7 @@ import os
 import sys
 
 from . import __version__
-from . import gallery, runner, templates as tmpl
+from . import runner, templates as tmpl
 from .checker import check_file, check_project
 from .lexer import LexError, tokenize, tokens_to_text
 from .project import load_project, resolve_target
@@ -137,40 +136,12 @@ def cmd_tokens(args: argparse.Namespace) -> int:
     return EXIT_OK
 
 
-def cmd_demo(args: argparse.Namespace) -> int:
-    if args.demo == "list":
-        demos = gallery.list_demos()
-        if not demos:
-            print("找不到示例库（设置 BIO_REPO 指向 bio 仓库）", file=sys.stderr)
-            return EXIT_ERR
-        if getattr(args, "json", False):
-            import json as _json
-            print(_json.dumps([{"index": d.index, "title": d.title,
-                                "filename": d.filename, "path": d.path} for d in demos]))
-            return EXIT_OK
-        print("BiuBiuBiu 示例画廊：")
-        for d in demos:
-            print(f"  {d.index:02d}  {d.filename:<28} {d.title}")
-        return EXIT_OK
-    if not args.demo:
-        print("用法：biolstudio demo <编号|名字>（biolstudio demo list 查看全部）", file=sys.stderr)
-        return EXIT_ERR
-    d = gallery.find_demo(args.demo)
-    if not d:
-        print(f"找不到示例 {args.demo!r}", file=sys.stderr)
-        return EXIT_ERR
-    bio = _need_bio()
-    return gallery.run_demo(d, bio)
-
-
 def cmd_doctor(args: argparse.Namespace) -> int:
     ok = True
     bio = runner.find_bio()
     print(f"bio 二进制:   {bio or '未找到'}")
     if not bio:
         ok = False
-    repo = gallery.find_repo()
-    print(f"bio 仓库:     {repo or '未找到（demo 不可用）'}")
     tdir = tmpl.template_dir()
     n = len(tmpl.list_templates())
     print(f"模板目录:     {tdir}（{n} 个模板）")
@@ -223,12 +194,6 @@ def build_parser() -> argparse.ArgumentParser:
     sp = sub.add_parser("tokens", help="调试：打印 Token 流")
     sp.add_argument("file")
     sp.set_defaults(func=cmd_tokens)
-
-    sp = sub.add_parser("demo", help="运行 bio 仓库示例（demo list 列出全部）")
-    sp.add_argument("demo", nargs="?", default=None,
-                    help="list=列出全部；否则为示例编号或文件名")
-    sp.add_argument("--json", action="store_true", help="demo list 输出 JSON")
-    sp.set_defaults(func=cmd_demo)
 
     sp = sub.add_parser("gui", help="启动 GUI（BBB IDE）")
     sp.set_defaults(func=cmd_gui)

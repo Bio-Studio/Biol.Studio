@@ -7,8 +7,6 @@
 //   project.check         → {diagnostics: [...]}
 //   project.run           → {ok, exit_code, output}
 //   project.build         → {ok, exit_code, output}
-//   demo.list             → {demos: [...]}
-//   demo.run              → {ok, exit_code, output}
 //   templates             → {templates: [...]}
 //   shutdown              → 退出服务
 package main
@@ -17,7 +15,6 @@ import (
 	"bufio"
 	"encoding/json"
 	"flag"
-	"fmt"
 	"io"
 	"log"
 	"net"
@@ -116,29 +113,6 @@ func handle(method string, params json.RawMessage) (any, *rpcError) {
 		}
 		r := biolang.BuildProject(root)
 		return r, nil
-
-	case "demo.list":
-		demos, err := biolang.ListDemos()
-		if err != nil {
-			return nil, &rpcError{Code: -32000, Message: err.Error()}
-		}
-		return map[string]any{"demos": demos}, nil
-
-	case "demo.run":
-		demo := strParam(params, "demo")
-		// 通过 gallery 路径运行：demo.list 里有 path，直接跑文件
-		demos, err := biolang.ListDemos()
-		if err != nil {
-			return nil, &rpcError{Code: -32000, Message: err.Error()}
-		}
-		for _, d := range demos {
-			if d.Title == demo || strings.HasSuffix(d.Path, demo) ||
-				fmt.Sprintf("%02d", d.Index) == demo || fmt.Sprintf("%d", d.Index) == demo {
-				r := biolang.RunFile(d.Path)
-				return r, nil
-			}
-		}
-		return nil, &rpcError{Code: -32602, Message: fmt.Sprintf("demo %q not found", demo)}
 
 	case "templates":
 		ts, err := biolang.ListTemplates()

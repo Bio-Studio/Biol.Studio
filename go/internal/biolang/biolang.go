@@ -2,7 +2,7 @@
 //
 // 设计（对齐 PLAN.md）：
 // - run/build：直接调用 bbb CLI（Rust 实现，解释器+编译器），流式透传输出
-// - new/check/demo：复用 Python 功能层（biolstudio CLI），进程调用包装
+// - new/check：复用 Python 功能层（biolstudio CLI），进程调用包装
 // - 全部无状态，供通讯层（server）和渲染层（gui）复用
 package biolang
 
@@ -129,7 +129,7 @@ func execCapture(bin string, args []string, cwd string) RunResult {
 	}
 }
 
-// ---------------- Python 功能层封装（new/check/demo） ----------------
+// ---------------- Python 功能层封装（new/check） ----------------
 
 // pythonBin 定位 biolstudio CLI（pip 安装的入口或项目内 python -m）。
 func pythonBin() string {
@@ -208,37 +208,6 @@ func CheckProject(root string) ([]Diagnostic, error) {
 		return nil, fmt.Errorf("check JSON parse failed: %v (output: %s)", err, out)
 	}
 	return diags, nil
-}
-
-// Demo — 示例画廊条目。
-type Demo struct {
-	Index    int    `json:"index"`
-	Title    string `json:"title"`
-	Filename string `json:"filename"`
-	Path     string `json:"path"`
-}
-
-// ListDemos 列出示例（python biolstudio demo --json）。
-func ListDemos() ([]Demo, error) {
-	bin := pythonBin()
-	var args []string
-	if bin == "" {
-		bin = "python3"
-		args = append(args, "-m", "biolstudio")
-	}
-	args = append(args, "demo", "list", "--json")
-	cmd := exec.Command(bin, args...)
-	var buf bytes.Buffer
-	cmd.Stdout = &buf
-	cmd.Stderr = &buf
-	if err := cmd.Run(); err != nil {
-		return nil, fmt.Errorf("demo list failed: %s", strings.TrimSpace(buf.String()))
-	}
-	var demos []Demo
-	if err := json.Unmarshal(buf.Bytes(), &demos); err != nil {
-		return nil, fmt.Errorf("demo JSON parse failed: %v", err)
-	}
-	return demos, nil
 }
 
 // ListTemplates 列出可用模板名（templates --json）。

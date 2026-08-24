@@ -19,4 +19,3 @@ class RenderContract:
     project_tree: str = "项目文件树（src/ + utils/ + package.toml）"
     editor: str = "语法高亮编辑器（token 流来自功能层 lexer.py）"
     output_panel: str = "运行/构建输出（来自通讯层事件）"
-    demo_gallery: str = "示例画廊（来自功能层 gallery.py）"

@@ -4,9 +4,9 @@ A toolbox for writing **BiuBiuBiu** projects quickly. Three layers:
 
 | Layer | Language | Status | Responsibility |
 |---|---|---|---|
-| Functional (business) | Python | ✅ done | project scaffolding, lexer/checker, example gallery, `bbb` CLI driver (`biolstudio/`) |
+| Functional (business) | Python | ✅ done | project scaffolding, lexer/checker, `bbb` CLI driver (`biolstudio/`) |
 | Communication | Go | ✅ done | JSON-RPC 2.0 service (stdio / TCP), tasks, protocol v0.1 (`go/server/`) |
-| Rendering | Go | ✅ done | Fyne GUI: project tree, highlighted editor, output panel, demo gallery (`go/gui/`) |
+| Rendering | Go | ✅ done | Fyne GUI: project tree, multi-tab editor, output panel (`go/gui/`) |
 
 Roadmap details: [PLAN.md](PLAN.md).
 
@@ -22,7 +22,6 @@ biolstudio new myapp -t project     # scaffold (supports --json)
 biolstudio check myapp --json       # static check as JSON diagnostics
 biolstudio run myapp                # run via bbb
 biolstudio build myapp              # build via bbb
-biolstudio demo list --json         # gallery as JSON
 biolstudio templates --json         # templates as JSON
 ```
 
@@ -43,7 +42,7 @@ printf '%s\n' \
 ```
 
 Methods: `ping` · `project.new` · `project.check` · `project.run` ·
-`project.build` · `demo.list` · `demo.run` · `templates` · `shutdown`.
+`project.build` · `templates` · `shutdown`.
 
 ### Go rendering layer
 
@@ -54,7 +53,6 @@ cd go && make gui && ./gui/biolstudio-gui
 ```
 
 - Project tree (src/ + utils/ + package.toml), multi-tab editor
-- Syntax-highlighted read-only preview for gallery examples
 - Run / build / check actions with live output panel
 - Template-based project wizard
 
@@ -86,10 +84,6 @@ biolstudio check myapp
 biolstudio run myapp
 biolstudio build myapp
 
-# Example gallery (from the biu repo examples/, BIO_REPO overrides the path)
-biolstudio demo list
-biolstudio demo 2          # run 02-requests.bio
-
 # Other
 biolstudio templates       # list templates
 biolstudio tokens x.bio    # debug: token stream
@@ -100,13 +94,12 @@ biolstudio doctor          # environment check
 
 ```
 biolstudio/
-  cli.py       # argparse entry (new/check/run/build/demo/tokens/doctor)
+  cli.py       # argparse entry (new/check/run/build/tokens/doctor)
   lexer.py     # BiuBiuBiu lexer (pure Python, token stream for check/highlight)
   checker.py   # structural check: balance, program/Main contract, need matching
   templates.py # template system (templates/ dir, BIOLSTUDIO_TEMPLATES to add)
   project.py   # project model + minimal TOML parser for package.toml
   runner.py    # bbb binary driver (run/build, dry-run preview)
-  gallery.py   # example gallery (reads bio repo examples/)
   comm.py      # communication-layer placeholder (protocol draft v0.1)
   render.py    # rendering-layer placeholder (view contract)
 templates/     # built-in templates (hello/project/requests/classes/threads)

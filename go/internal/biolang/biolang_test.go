@@ -52,19 +52,6 @@ func TestRunProject(t *testing.T) {
 	}
 }
 
-func TestListDemos(t *testing.T) {
-	demos, err := ListDemos()
-	if err != nil {
-		t.Skipf("demos unavailable: %v", err)
-	}
-	if len(demos) == 0 {
-		t.Fatal("no demos listed")
-	}
-	if demos[0].Index < 1 || demos[0].Path == "" {
-		t.Fatalf("bad demo entry: %+v", demos[0])
-	}
-}
-
 func TestListTemplates(t *testing.T) {
 	ts, err := ListTemplates()
 	if err != nil {
